@@ -16,6 +16,7 @@ app.get("/api/post", async (req, res) => {
 
   let browser = null;
   try {
+    // Puppeteer launch (Render/container uyumlu)
     browser = await puppeteer.launch({
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
