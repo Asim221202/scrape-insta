@@ -5,26 +5,39 @@ const app = express();
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("Instagram Scraper API is running!");
+  res.send("Instagram GraphQL Scraper API is running!");
 });
+
+// Helper: username -> userId
+async function getUserId(username) {
+  const url = `https://www.instagram.com/${username}/?__a=1&__d=dis`;
+  const response = await axios.get(url, {
+    headers: { "User-Agent": "Mozilla/5.0" }
+  });
+  if (!response.data?.graphql?.user) throw new Error("Kullanıcı bulunamadı veya JSON değişmiş");
+  return response.data.graphql.user.id;
+}
 
 // Post + Reel bilgisi API
 app.get("/api/posts/:username", async (req, res) => {
   const { username } = req.params;
   try {
-    // JSON endpoint (public profil)
-    const url = `https://www.instagram.com/${username}/?__a=1&__d=dis`;
-    const response = await axios.get(url, {
-      headers: { 
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" 
-      }
+    const userId = await getUserId(username);
+
+    // GraphQL query ile post/reel bilgisi
+    const queryHash = "58b6785bea111c67129decbe6a448951";
+    const variables = {
+      id: userId,
+      first: 5 // İlk 5 post
+    };
+
+    const graphqlUrl = `https://www.instagram.com/graphql/query/?query_hash=${queryHash}&variables=${encodeURIComponent(JSON.stringify(variables))}`;
+    const response = await axios.get(graphqlUrl, {
+      headers: { "User-Agent": "Mozilla/5.0" }
     });
 
-    const user = response.data.graphql.user;
-    const edges = user.edge_owner_to_timeline_media.edges;
-
-    // İlk 5 post/reel bilgisi
-    const posts = edges.slice(0, 5).map(edge => {
+    const edges = response.data.data.user.edge_owner_to_timeline_media.edges;
+    const posts = edges.map(edge => {
       const media = edge.node;
       return {
         id: media.id,
@@ -41,7 +54,6 @@ app.get("/api/posts/:username", async (req, res) => {
 
     res.json({
       username: username,
-      profilePic: user.profile_pic_url_hd,
       posts: posts
     });
 
@@ -50,6 +62,6 @@ app.get("/api/posts/:username", async (req, res) => {
   }
 });
 
-// Render otomatik port
+// Render port
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API is running on port ${PORT}`));
