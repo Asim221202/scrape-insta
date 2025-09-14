@@ -1,52 +1,59 @@
 const express = require("express");
-const axios = require("axios");
+const puppeteer = require("puppeteer");
 
 const app = express();
 
 app.get("/", (req, res) => {
-  res.send("Instagram Post Scraper API is running!");
+  res.send("Instagram Puppeteer Scraper API is running!");
 });
 
 app.get("/api/post", async (req, res) => {
   const { url } = req.query; // ?url=https://www.instagram.com/p/SHORTCODE/
   if (!url) return res.status(400).json({ error: "url parametresi gerekli" });
 
+  let browser;
   try {
-    // HTML fetch
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Cookie": "ig_cb=1"
-      }
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
-    const html = response.data;
+    const page = await browser.newPage();
 
-    // Embed JSON parse
-    const match = html.match(/<script type="text\/javascript">window\._sharedData = (.*);<\/script>/)
-               || html.match(/<script type="text\/javascript">window\.__additionalDataLoaded\('feed', (.*)\);<\/script>/);
-    if (!match) throw new Error("Embed JSON bulunamadı");
+    // Guest cookie veya bot login ekleyebilirsin
+    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
 
-    const json = JSON.parse(match[1]);
-    // Shortcode media JSON’u
-    const media = json.entry_data?.PostPage?.[0]?.graphql?.shortcode_media
-              || json?.graphql?.shortcode_media;
+    await page.goto(url, { waitUntil: "networkidle2" });
 
-    if (!media) throw new Error("Video bilgisi bulunamadı");
+    // Post/reel verilerini sayfa context’inde al
+    const data = await page.evaluate(() => {
+      const jsonScript = Array.from(document.querySelectorAll('script[type="text/javascript"]'))
+        .find(s => s.textContent.includes("shortcode_media"));
+      if (!jsonScript) return null;
 
-    res.json({
-      id: media.id,
-      type: media.is_video ? "reel/video" : "image",
-      caption: media.edge_media_to_caption.edges[0]?.node.text || "",
-      thumbnail: media.display_url,
-      shortcode: media.shortcode,
-      url: url,
-      video_url: media.is_video ? media.video_url : null,
-      likes: media.edge_media_preview_like?.count || media.edge_liked_by?.count || 0,
-      comments: media.edge_media_to_parent_comment?.count || media.edge_media_to_comment?.count || 0
+      const match = jsonScript.textContent.match(/window\._sharedData = (.*);/);
+      const json = match ? JSON.parse(match[1]) : null;
+      const media = json?.entry_data?.PostPage?.[0]?.graphql?.shortcode_media;
+      return media ? {
+        id: media.id,
+        type: media.is_video ? "reel/video" : "image",
+        caption: media.edge_media_to_caption.edges[0]?.node.text || "",
+        thumbnail: media.display_url,
+        shortcode: media.shortcode,
+        url: window.location.href,
+        video_url: media.is_video ? media.video_url : null,
+        likes: media.edge_media_preview_like?.count || media.edge_liked_by?.count || 0,
+        comments: media.edge_media_to_parent_comment?.count || media.edge_media_to_comment?.count || 0
+      } : null;
     });
+
+    if (!data) throw new Error("Video bilgisi bulunamadı");
+
+    res.json(data);
 
   } catch (err) {
     res.status(500).json({ error: "Veri çekilemedi", detail: err.message });
+  } finally {
+    if (browser) await browser.close();
   }
 });
 
