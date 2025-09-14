@@ -3,6 +3,11 @@ const axios = require("axios");
 
 const app = express();
 
+// Basit health check
+app.get("/", (req, res) => {
+  res.send("Instagram Scraper API is running!");
+});
+
 // Post + Reel bilgisi
 app.get("/api/posts/:username", async (req, res) => {
   const { username } = req.params;
@@ -16,7 +21,7 @@ app.get("/api/posts/:username", async (req, res) => {
     const data = JSON.parse(sharedData[1]);
     const edges = data.entry_data.ProfilePage[0].graphql.user.edge_owner_to_timeline_media.edges;
 
-    // İlk 5 post için detaylı bilgi çekelim (fazla istek atmamak için limit)
+    // İlk 5 post için detaylı bilgi çekelim
     const posts = await Promise.all(edges.slice(0, 5).map(async (edge) => {
       const shortcode = edge.node.shortcode;
       const postUrl = `https://www.instagram.com/p/${shortcode}/`;
@@ -53,5 +58,6 @@ app.get("/api/posts/:username", async (req, res) => {
   }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => console.log(`API http://localhost:${PORT} üzerinde çalışıyor`));
+// Render otomatik port kullanır
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`API is running on port ${PORT}`));
