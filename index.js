@@ -4,6 +4,12 @@ const chromium = require("chrome-aws-lambda");
 
 const app = express();
 
+// Health check
+app.get("/", (req, res) => {
+  res.send("Instagram Puppeteer Scraper API is running!");
+});
+
+// Post/Reel API
 app.get("/api/post", async (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: "url parametresi gerekli" });
@@ -21,6 +27,7 @@ app.get("/api/post", async (req, res) => {
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
     await page.goto(url, { waitUntil: "networkidle2" });
 
+    // Post/reel verilerini sayfa context’inde al
     const data = await page.evaluate(() => {
       const script = Array.from(document.querySelectorAll('script'))
         .find(s => s.textContent.includes("shortcode_media"));
@@ -52,5 +59,6 @@ app.get("/api/post", async (req, res) => {
   }
 });
 
+// Render port
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API is running on port ${PORT}`));
