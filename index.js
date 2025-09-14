@@ -1,30 +1,26 @@
 const express = require("express");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
+const chromium = require("chrome-aws-lambda");
 
 const app = express();
 
-app.get("/", (req, res) => {
-  res.send("Instagram Puppeteer Scraper API is running!");
-});
-
 app.get("/api/post", async (req, res) => {
-  const { url } = req.query; // ?url=https://www.instagram.com/p/SHORTCODE/
+  const { url } = req.query;
   if (!url) return res.status(400).json({ error: "url parametresi gerekli" });
 
-  let browser;
+  let browser = null;
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath,
+      headless: chromium.headless
     });
+
     const page = await browser.newPage();
-
-    // Guest cookie veya bot login ekleyebilirsin
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-
     await page.goto(url, { waitUntil: "networkidle2" });
 
-    // Post/reel verilerini sayfa context’inde al
     const data = await page.evaluate(() => {
       const jsonScript = Array.from(document.querySelectorAll('script[type="text/javascript"]'))
         .find(s => s.textContent.includes("shortcode_media"));
@@ -47,7 +43,6 @@ app.get("/api/post", async (req, res) => {
     });
 
     if (!data) throw new Error("Video bilgisi bulunamadı");
-
     res.json(data);
 
   } catch (err) {
@@ -57,6 +52,5 @@ app.get("/api/post", async (req, res) => {
   }
 });
 
-// Render port
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API is running on port ${PORT}`));
