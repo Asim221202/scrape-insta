@@ -1,6 +1,5 @@
 const express = require("express");
-const puppeteer = require("puppeteer-core");
-const chromium = require("chrome-aws-lambda");
+const puppeteer = require("puppeteer"); // puppeteer-core değil
 
 const app = express();
 
@@ -16,19 +15,15 @@ app.get("/api/post", async (req, res) => {
 
   let browser = null;
   try {
-    // Puppeteer launch (Render/container uyumlu)
     browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath,
-      headless: chromium.headless,
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
     await page.goto(url, { waitUntil: "networkidle2" });
 
-    // Post/reel verilerini sayfa context’inde al
     const data = await page.evaluate(() => {
       const script = Array.from(document.querySelectorAll('script'))
         .find(s => s.textContent.includes("shortcode_media"));
