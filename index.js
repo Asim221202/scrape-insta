@@ -14,7 +14,7 @@ app.get("/api/post", async (req, res) => {
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath,
-      headless: chromium.headless
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();
@@ -22,11 +22,11 @@ app.get("/api/post", async (req, res) => {
     await page.goto(url, { waitUntil: "networkidle2" });
 
     const data = await page.evaluate(() => {
-      const jsonScript = Array.from(document.querySelectorAll('script[type="text/javascript"]'))
+      const script = Array.from(document.querySelectorAll('script'))
         .find(s => s.textContent.includes("shortcode_media"));
-      if (!jsonScript) return null;
+      if (!script) return null;
 
-      const match = jsonScript.textContent.match(/window\._sharedData = (.*);/);
+      const match = script.textContent.match(/window\._sharedData = (.*);/);
       const json = match ? JSON.parse(match[1]) : null;
       const media = json?.entry_data?.PostPage?.[0]?.graphql?.shortcode_media;
       return media ? {
